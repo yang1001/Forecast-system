@@ -1,0 +1,44 @@
+{
+  "2026-05-13_US": {
+    "date": "2026-05-13",
+    "country": "US",
+    "indicators": {
+      "fed_funds_rate": 3.64,
+      "treasury_10y": 4.42,
+      "cpi_yoy": 332.407,
+      "unemployment": 4.3,
+      "pmi_manufacturing": 12596.0,
+      "sp500": 7400.96,
+      "gold": 4708.8,
+      "oil": 100.76,
+      "pboc_fix": 6.8431
+    },
+    "cached_at": "2026-05-13T15:28:22.659938"
+  },
+  "2026-05-13_CN": {
+    "date": "2026-05-13",
+    "country": "CN",
+    "indicators": {
+      "pboc_fix_usd": 6.8431,
+      "pboc_fix": 6.8431,
+      "shanghai_comp": 4242.572
+    },
+    "cached_at": "2026-05-13T15:28:23.685030"
+  },
+  "2026-05-13_EU": {
+    "date": "2026-05-13",
+    "country": "EU",
+    "indicators": {
+      "eu_cpi": 1.9
+    },
+    "cached_at": "2026-05-13T15:28:42.864508"
+  },
+  "2026-05-13_CA": {
+    "date": "2026-05-13",
+    "country": "CA",
+    "indicators": {
+      "oil_price": 100.75
+    },
+    "cached_at": "2026-05-13T15:28:46.633912"
+  }
+}

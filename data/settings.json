@@ -1,0 +1,15 @@
+{
+  "password_hash": "0e6738003f33d8490909fa8983f34c1e2d85077d4322d65a23a8e57309bd9bfc",
+  "password_salt": "e8919b447ac1544318e456df3962136e",
+  "api_keys": {
+    "fred_api_key": "UlFSB1VdCQQBUQVVVwlWDQYLUlxWV1kAXAoFV1YBUFI=",
+    "openai_base_url": "WBFCR0ACHx9SFlodAF1RSUNcVVJIAldUF0VX",
+    "openai_model": "VABTR0BdVVseEAceAlRVSlg=",
+    "banxico_api_key": "VVYPDwMKAAhRAAMCAVsCDANYUlhfAF1cC1BUVwIFBlVWU1dSC1oABgUCAQZQDVEKBwBSAANRXV8BAQMKUAYDUA==",
+    "openai_api_key": "Qw4bB1ZbBFQCBAMDAg8MDVYKBgBTU10LAQIABFVVAlUHAQI="
+  },
+  "http_proxy": "",
+  "http_timeout_sec": 25,
+  "cfets_realtime_url": "",
+  "hkma_spot_rates_url": ""
+}

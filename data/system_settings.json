@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "version": 1,
+    "app": "forecast-system-v6",
+    "exported_at": "2026-05-13T16:39:31.939918"
+  },
+  "network": {
+    "cfets_realtime_url": "",
+    "hkma_spot_rates_url": "",
+    "http_proxy": "",
+    "http_timeout_sec": 25
+  },
+  "api_keys": {
+    "fred_api_key": "b4d0fe94276f31b462be06a9d9cdbba7",
+    "openai_api_key": "sk-0ec4d1b00f784f36952e291f7a6307d4",
+    "openai_base_url": "https://api.deepseek.com/v1",
+    "openai_model": "deepseek-v4-flash",
+    "news_api_key": "",
+    "banxico_api_key": "e3980208bf01ec653aba9aee3c2d6f70f6ae8b066d2545e379b9e0ef92e9de25"
+  }
+}
