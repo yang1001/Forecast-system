@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多币种汇率预测系统</title>
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #21262d;
+      --border: rgba(255,255,255,0.08);
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent2: #1f6feb;
+      --up: #3fb950;
+      --down: #f85149;
+      --flat: #d29922;
+      --radius: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+        
+        body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+        'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ─── 顶栏 ─────────────────────────────────────────────── */
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+            display: flex;
+            align-items: center;
+      height: 56px;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-title { font-size: 17px; font-weight: 700; color: var(--text); }
+    .topbar-title span { color: var(--accent); }
+    .topbar-spacer { flex: 1; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px; font-size: 12px;
+      color: var(--muted);
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    .dot.green { background: var(--up); }
+    .dot.orange { background: var(--flat); }
+    .dot.red { background: var(--down); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: var(--radius);
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all .2s;
+    }
+    .icon-btn:hover { background: var(--bg); color: var(--text); border-color: var(--accent); }
+
+    /* ─── 主容器 ────────────────────────────────────────────── */
+    .main { max-width: 1600px; margin: 0 auto; padding: 20px 16px; }
+
+    /* ─── 控制行 ────────────────────────────────────────────── */
+    .ctrl-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .ctrl-label { color: var(--muted); font-size: 13px; }
+
+    .refresh-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 20px;
+      background: linear-gradient(135deg, #1f6feb, #58a6ff);
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+    }
+    .refresh-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(88,166,255,.4); }
+    .refresh-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .refresh-btn .spin { animation: spin .8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .last-update { color: var(--muted); font-size: 12px; }
+    .next-update { color: var(--accent); font-size: 12px; }
+
+    /* ─── 表格卡片 ──────────────────────────────────────────── */
+    .table-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; /* Firefox：隐藏横向滚动条 */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    .table-wrap::-webkit-scrollbar {
+      display: none; /* Chromium/WebKit：隐藏滚动条 */
+    }
+
+    table {
+            width: 100%;
+      border-collapse: collapse;
+      min-width: 1100px;
+    }
+
+    thead tr { background: var(--bg3); }
+    thead th {
+      padding: 12px 14px;
+            text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+    thead th.left { text-align: left; }
+    thead .th-group { background: rgba(88,166,255,.06); }
+    thead .th-hist  { background: rgba(255,255,255,.03); }
+    thead .th-fut   { background: rgba(63,185,80,.05); }
+    thead .th-live  { background: rgba(88,166,255,.1); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+
+    tbody td {
+      padding: 11px 14px;
+            text-align: center;
+      font-size: 13px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    tbody td.left { text-align: left; }
+
+    .pair-cell { min-width: 130px; }
+    .pair-sell { font-weight: 700; font-size: 15px; }
+    .pair-buy  { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .pair-code { font-size: 11px; color: var(--accent); }
+
+    .rate-val { font-weight: 600; font-size: 14px; }
+    .rate-chg { font-size: 11px; margin-top: 2px; }
+
+    .up   { color: var(--up); }
+    .down { color: var(--down); }
+    .flat { color: var(--flat); }
+    .muted { color: var(--muted); }
+
+    .live-cell .rate-val { font-size: 16px; color: var(--accent); }
+
+    .pred-cell {
+      position: relative;
+    }
+    .pred-cell:hover .pred-tooltip { display: block; }
+    .pred-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1c2128;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      width: 200px;
+      z-index: 50;
+      box-shadow: var(--shadow);
+      text-align: left;
+      pointer-events: none;
+    }
+    tbody tr:first-child .pred-cell .pred-tooltip {
+      top: calc(100% + 6px);
+      bottom: auto;
+    }
+    .pred-cell:last-child .pred-tooltip {
+      left: auto;
+      right: 0;
+      transform: none;
+    }
+    .pred-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--border);
+    }
+    tbody tr:first-child .pred-cell .pred-tooltip::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: var(--border);
+    }
+    .pred-cell:last-child .pred-tooltip::after {
+      left: auto;
+      right: 20px;
+      transform: none;
+    }
+    .tooltip-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .tooltip-label { color: var(--muted); }
+    .tooltip-val { font-weight: 600; }
+
+    .loading-row td { padding: 40px; text-align: center; color: var(--muted); }
+    .mini-spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+
+    .tag {
+      display: inline-block; padding: 2px 7px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .tag-up   { background: rgba(63,185,80,.15);  color: var(--up); }
+    .tag-down { background: rgba(248,81,73,.15); color: var(--down); }
+    .tag-flat { background: rgba(210,153,34,.15); color: var(--flat); }
+    .tag-nodata { background: var(--bg3); color: var(--muted); }
+
+    /* ─── 底部信息 ──────────────────────────────────────────── */
+    .info-row {
+      display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;
+    }
+    .info-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px; flex: 1; min-width: 200px;
+    }
+    .info-card-title { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+    .info-card-val   { font-size: 14px; font-weight: 600; }
+
+    /* ─── 模态框（设置）────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 500;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; width: 540px; max-width: 95vw;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 16px 64px rgba(0,0,0,.6);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:none;opacity:1} }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 16px; }
+    .modal-close {
+      background: none; border: none; color: var(--muted);
+      font-size: 20px; cursor: pointer; line-height: 1;
+    }
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body { padding: 20px; }
+
+    .form-section { margin-bottom: 24px; }
+    .form-section-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      color: var(--muted); letter-spacing: .08em; margin-bottom: 12px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+
+    .form-row { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 9px 12px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px;
+      outline: none; transition: border-color .2s;
+    }
+    .form-input:focus { border-color: var(--accent); }
+
+    .form-row-inline { display: flex; gap: 10px; }
+    .form-row-inline .form-input { flex: 1; }
+
+    .test-btn {
+      padding: 9px 16px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--muted); cursor: pointer;
+      font-size: 13px; white-space: nowrap; transition: all .2s;
+    }
+    .test-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .test-result {
+      font-size: 12px; margin-top: 6px; padding: 6px 10px;
+      border-radius: 6px; display: none;
+    }
+    .test-result.ok   { background: rgba(63,185,80,.1);  color: var(--up); display: block; }
+    .test-result.err  { background: rgba(248,81,73,.1); color: var(--down); display: block; }
+
+    .modal-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; justify-content: flex-end;
+    }
+    .btn-primary {
+      padding: 9px 20px; background: var(--accent2); border: none;
+      border-radius: 8px; color: #fff; font-size: 13px;
+      font-weight: 600; cursor: pointer; transition: all .2s;
+    }
+    .btn-primary:hover { background: var(--accent); }
+    .btn-secondary {
+      padding: 9px 20px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); font-size: 13px; cursor: pointer; transition: all .2s;
+    }
+    .btn-secondary:hover { color: var(--text); border-color: var(--text); }
+
+    /* 密码验证层 */
+    .auth-overlay {
+      padding: 20px; text-align: center;
+    }
+    .auth-overlay h3 { margin-bottom: 16px; font-size: 15px; }
+    .auth-input-row { display: flex; gap: 8px; max-width: 320px; margin: 0 auto; }
+
+    /* ─── Toast ─────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1c2128; border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 20px;
+      font-size: 13px; z-index: 1000;
+      transition: transform .3s ease;
+      box-shadow: var(--shadow);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.toast-ok  { border-color: var(--up); color: var(--up); }
+    #toast.toast-err { border-color: var(--down); color: var(--down); }
+
+    /* ─── 响应式 ─────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .topbar { padding: 0 12px; }
+      .main { padding: 12px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ 顶栏 ═══════════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-title">多币种<span>汇率预测</span>系统</div>
+  <div class="topbar-spacer"></div>
+
+  <div class="status-pill">
+    <div class="dot" id="cfets-dot"></div>
+    <span id="cfets-status">实时汇率连接中...</span>
+  </div>
+  <div class="status-pill">
+    <div class="dot" id="sched-dot"></div>
+    <span id="sched-status">调度器</span>
+  </div>
+
+  <button class="icon-btn" title="系统设置" onclick="openSettings()">⚙️</button>
+</header>
+
+<!-- ═══════════════════════ 主内容 ══════════════════════════════ -->
+<main class="main">
+
+  <!-- 控制行 -->
+  <div class="ctrl-row">
+    <button class="refresh-btn" id="refreshBtn" onclick="triggerManualPredict()">
+      <span id="refreshIcon">🔄</span> 手动刷新预测
+    </button>
+    <div>
+      <div class="last-update" id="lastUpdate">最后更新：—</div>
+      <div class="next-update" id="nextUpdate"></div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="ctrl-label" id="predCount">共 0 个货币对</div>
+  </div>
+
+  <!-- 汇率预测表格 -->
+  <div class="table-card">
+    <div class="table-wrap">
+      <table id="rateTable">
+        <thead>
+          <tr>
+            <th class="left th-group" rowspan="2" style="min-width:130px">货币对</th>
+            <th class="th-hist" colspan="2">历史参考</th>
+            <th class="th-live">实时汇率</th>
+            <th class="th-fut" colspan="6">预测汇率</th>
+          </tr>
+          <tr>
+            <th class="th-hist">过去 1 周</th>
+            <th class="th-hist">过去 1 月</th>
+            <th class="th-live">当前</th>
+            <th class="th-fut">未来 1 周</th>
+            <th class="th-fut">未来 2 周</th>
+            <th class="th-fut">未来 1 月</th>
+            <th class="th-fut">未来 2 月</th>
+            <th class="th-fut">未来 3 月</th>
+            <th class="th-fut">未来 6 月</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr class="loading-row">
+            <td colspan="10"><span class="mini-spinner"></span>加载中，请稍候...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 信息卡片行 -->
+  <div class="info-row">
+    <div class="info-card">
+      <div class="info-card-title">数据源</div>
+      <div class="info-card-val" style="font-size:12px;color:var(--muted);line-height:1.8">
+        实时汇率：中国外汇交易中心 CFETS<br>
+        港元汇率：香港金管局 HKMA<br>
+        宏观数据：FRED / ECB / BoE / BoC / BoJ / RBA / Banxico
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title">预测方法</div>
+      <div class="info-card-val" style="font-size:12px;color:var(--muted);line-height:1.8">
+        USD/CNY：1周/2周与30日ML衔接，1月/2月/3月 LightGBM 集成，6个月由90日ML外推<br>
+        EUR/CNY：技术+宏观基础上按美元指数微调<br>
+        AUD/CAD/MXN：长端波动限幅；其他货币对：技术分析 + 宏观 + 情绪
+      </div>
+      <div id="usdCnyFrameworkNote" class="info-card-val" style="font-size:11px;color:var(--accent);line-height:1.55;margin-top:8px;display:none"></div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title">自动预测时间</div>
+      <div class="info-card-val" style="font-size:13px;line-height:2">
+        🕘 09:30 开盘<br>
+        🕦 11:30 午休<br>
+        🕒 15:00 收盘
+      </div>
+    </div>
+    <div class="info-card" style="flex:0;min-width:160px">
+      <div class="info-card-title">免责声明</div>
+      <div class="info-card-val" style="font-size:11px;color:var(--muted);line-height:1.7">
+        预测结果仅供参考<br>不构成任何投资建议<br>汇率受多种因素影响
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ═══════════════════════ 设置模态框 ══════════════════════════ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⚙️ 系统设置</h2>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- 密码验证层 -->
+      <div id="authLayer" class="auth-overlay">
+        <h3>🔐 请输入管理员密码</h3>
+        <div class="auth-input-row">
+          <input class="form-input" type="password" id="authPwd" placeholder="密码"
+                 onkeydown="if(event.key==='Enter')verifySettingsPassword()">
+          <button class="btn-primary" onclick="verifySettingsPassword()">验证</button>
+        </div>
+        <div class="test-result err" id="authError"></div>
+      </div>
+
+      <!-- 设置内容层 -->
+      <div id="settingsContent" style="display:none">
+
+        <!-- 官方汇率（无 Key，可改 URL / 代理） -->
+        <div class="form-section">
+          <div class="form-section-title">官方汇率接口（中国外汇交易中心 / 香港金管局）</div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px">
+            二者均为<strong>公开 Web 接口</strong>，无需 API Key。若默认地址变更或需走企业网关，可在下方填写完整 URL；留空则使用内置默认地址。
+          </p>
+          <div class="form-row">
+            <label class="form-label">CFETS 实时询价 POST 地址</label>
+            <input class="form-input" type="text" id="cfetsUrl"
+              placeholder="https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprRealTime">
+            </div>
+          <div class="form-row">
+            <label class="form-label">HKMA 美元港币即期汇率 GET 地址</label>
+            <input class="form-input" type="text" id="hkmaUrl"
+              placeholder="https://api.hkma.gov.hk/public/market-data-and-statistics/monthly-statistical-bulletin/exchange-fund/spot-exchange-rates?offset=0&choose=end_of_period">
+            </div>
+          <div class="form-row">
+            <label class="form-label">HTTP(S) 代理（访问 Yahoo、NewsAPI 等外网时使用）</label>
+            <input class="form-input" type="text" id="httpProxy" placeholder="例如 http://127.0.0.1:7890（无则留空）">
+            </div>
+          <div class="form-row">
+            <label class="form-label">外网请求超时（秒，5–120）</label>
+            <input class="form-input" type="number" id="httpTimeout" min="5" max="120" value="25" style="max-width:120px">
+        </div>
+                </div>
+                
+        <!-- 连通性测试 -->
+        <div class="form-section">
+          <div class="form-section-title">数据源连通性测试</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+            测试将使用<strong>上方</strong>填写的代理与超时（可先填再测，保存后预测任务也会使用该配置）。
+                    </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="test-btn" id="testFredBtn" onclick="testFredKey()">🔍 FRED</button>
+            <button class="test-btn" id="testOpenAIBtn" onclick="testOpenAIKey()">🔍 LLM</button>
+          </div>
+          <div class="test-result" id="connResult"></div>
+                </div>
+                
+        <!-- FRED API -->
+        <div class="form-section">
+          <div class="form-section-title">FRED API（美国宏观数据）</div>
+          <div class="form-row">
+            <label class="form-label">API Key
+              <a href="https://fred.stlouisfed.org/docs/api/api_key.html"
+                 target="_blank" style="color:var(--accent);font-size:11px;margin-left:6px">
+                免费注册 →
+              </a>
+            </label>
+            <input class="form-input" type="password" id="fredKey" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+            </div>
+        </div>
+        
+        <!-- LLM 情绪分析 -->
+        <div class="form-section">
+          <div class="form-section-title">LLM 情绪分析</div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:10px">
+            DeepSeek 等平台请填写 <strong>API Base URL</strong> 为 <code style="font-size:11px">https://api.deepseek.com/v1</code>（保存时会自动补全 <code style="font-size:11px">/v1</code>）。若保存后仍变回 OpenAI 地址，多半是浏览器自动填充覆盖，请关闭该提示或对输入框右键「忽略此字段」。
+          </p>
+          <div class="form-row">
+            <label class="form-label">API Key（兼容 OpenAI 格式）</label>
+            <input class="form-input" type="password" id="openaiKey" placeholder="sk-..." autocomplete="new-password" data-lpignore="true" data-1p-ignore>
+                </div>
+          <div class="form-row">
+            <label class="form-label">API Base URL（第三方服务填写）</label>
+            <input class="form-input" type="text" id="openaiBase" placeholder="https://api.deepseek.com/v1" autocomplete="off" data-lpignore="true" data-1p-ignore>
+                </div>
+          <div class="form-row">
+            <label class="form-label">模型名称</label>
+            <input class="form-input" type="text" id="openaiModel" placeholder="deepseek-chat" autocomplete="off" data-lpignore="true">
+            </div>
+        </div>
+        
+        <!-- NewsAPI -->
+        <div class="form-section">
+          <div class="form-section-title">NewsAPI（财经新闻，可选）</div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+            <strong>newsapi.org</strong> 在国内网络常无法直连。可不填 Key，系统会使用<strong>新浪财经</strong>等国内源做情绪分析；若需英文新闻，请填写 Key 并在上方配置<strong> HTTP 代理</strong>后重试连通性测试。
+          </p>
+          <div class="form-row">
+            <label class="form-label">API Key
+              <a href="https://newsapi.org/register" target="_blank"
+                 style="color:var(--accent);font-size:11px;margin-left:6px">
+                免费注册 →
+              </a>
+            </label>
+            <input class="form-input" type="password" id="newsKey" placeholder="留空则仅用国内新闻源">
+            </div>
+            </div>
+            
+        <!-- Banxico -->
+        <div class="form-section">
+          <div class="form-section-title">Banxico API（墨西哥央行，可选）</div>
+          <div class="form-row">
+            <label class="form-label">API Token
+              <a href="https://www.banxico.org.mx/SieAPIRest/service/v1/token"
+                 target="_blank" style="color:var(--accent);font-size:11px;margin-left:6px">
+                获取 Token →
+              </a>
+            </label>
+            <input class="form-input" type="password" id="banxicoKey" placeholder="Token">
+            </div>
+            </div>
+            
+        <!-- 本地 JSON（与 data/system_settings.json 同步） -->
+        <div class="form-section">
+          <div class="form-section-title">本地 JSON 配置（备份 / 迁移）</div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+            点击<strong>保存设置</strong>后，服务端会将完整配置写入 <code style="font-size:11px;background:var(--bg3);padding:2px 6px;border-radius:4px">data/system_settings.json</code>（UTF-8 JSON，含明文 Key，请妥善保管）。若主配置中还没有任何 API Key，<strong>下次启动</strong>时会自动从该文件加载。<br>
+            也可使用下方按钮导出到本机或从备份文件恢复。
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="test-btn" onclick="exportSettingsJson()">⬇ 导出 JSON</button>
+            <button type="button" class="test-btn" onclick="document.getElementById('importSettingsFile').click()">⬆ 从文件导入</button>
+            <input type="file" id="importSettingsFile" accept=".json,application/json" style="display:none" onchange="importSettingsJsonFile(event)">
+          </div>
+            </div>
+            
+        <!-- 修改密码 -->
+        <div class="form-section">
+          <div class="form-section-title">修改管理员密码</div>
+          <div class="form-row">
+            <label class="form-label">新密码（至少 6 位）</label>
+            <input class="form-input" type="password" id="newPwd" placeholder="新密码">
+            </div>
+          <button class="test-btn" onclick="changePassword()">修改密码</button>
+          <div class="test-result" id="pwdResult"></div>
+        </div>
+        
+            </div>
+        </div>
+        
+    <div class="modal-footer" id="settingsFooter" style="display:none">
+      <button class="btn-secondary" onclick="closeSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">💾 保存设置</button>
+    </div>
+  </div>
+    </div>
+
+<!-- Toast -->
+<div id="toast"></div>
+    
+    <script>
+// ════════════════════════════════════════════════════════════
+//  全局状态
+// ════════════════════════════════════════════════════════════
+let _verifiedPassword = '';
+let _latestData = null;
+let _polling = null;
+
+const CURRENCY_PAIRS = [
+  { pair: 'USD/CNY', sell: '美元 USD', buy: '人民币 CNY' },
+  { pair: 'EUR/CNY', sell: '欧元 EUR', buy: '人民币 CNY' },
+  { pair: 'GBP/CNY', sell: '英镑 GBP', buy: '人民币 CNY' },
+  { pair: 'CAD/CNY', sell: '加元 CAD', buy: '人民币 CNY' },
+  { pair: 'JPY/CNY', sell: '日元 JPY', buy: '人民币 CNY' },
+  { pair: 'AUD/CNY', sell: '澳元 AUD', buy: '人民币 CNY' },
+  { pair: 'MXN/CNY', sell: '墨西哥比索 MXN', buy: '人民币 CNY' },
+  { pair: 'USD/HKD', sell: '美元 USD', buy: '港币 HKD' },
+  { pair: 'EUR/HKD', sell: '欧元 EUR', buy: '港币 HKD' },
+  { pair: 'GBP/HKD', sell: '英镑 GBP', buy: '港币 HKD' },
+];
+
+const HORIZON_LABELS = {
+  '1w': '未来1周', '2w': '未来2周',
+  '1m': '未来1月', '2m': '未来2月',
+  '3m': '未来3月', '6m': '未来6月',
+};
+
+// ════════════════════════════════════════════════════════════
+//  格式化工具
+// ════════════════════════════════════════════════════════════
+function fmt(v, decimals = 4) {
+  if (v == null) return '—';
+  return parseFloat(v).toFixed(decimals);
+}
+
+function fmtRate(pair, v) {
+  if (v == null) return '—';
+  const dec = pair.includes('JPY') ? 4 : 4;
+  return parseFloat(v).toFixed(dec);
+}
+
+function fmtChg(current, ref) {
+  if (current == null || ref == null || ref === 0) return null;
+  return ((current - ref) / ref * 100);
+}
+
+function chgClass(pct) {
+  if (pct == null) return '';
+  if (pct > 0.01) return 'up';
+  if (pct < -0.01) return 'down';
+  return 'flat';
+}
+
+function chgTag(dir) {
+  if (!dir) return '<span class="tag tag-nodata">—</span>';
+  const map = { '涨': 'tag-up', '跌': 'tag-down', '平': 'tag-flat' };
+  const cls = map[dir] || 'tag-nodata';
+  const ico = dir === '涨' ? '↑' : (dir === '跌' ? '↓' : '→');
+  return `<span class="tag ${cls}">${ico} ${dir}</span>`;
+}
+
+function fmtTs(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    const d = new Date(isoStr);
+    return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } catch { return '—'; }
+}
+
+// ════════════════════════════════════════════════════════════
+//  表格渲染
+// ════════════════════════════════════════════════════════════
+function renderTable(predData, rates) {
+  const tbody = document.getElementById('tableBody');
+  const hasPreds = predData && predData.predictions && Object.keys(predData.predictions).length > 0;
+  const hasRates = rates && Object.keys(rates).length > 0;
+
+  if (!hasPreds && !hasRates) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="10" style="color:var(--muted)">
+      暂无预测数据，请点击"手动刷新预测"按钮触发首次预测</td></tr>`;
+    document.getElementById('predCount').textContent = '共 0 个货币对';
+    return;
+  }
+
+  const predictions = predData?.predictions || {};
+  const liveRates = (hasRates ? rates : null) || predData?.rates || {};
+
+  let html = '';
+  let count = 0;
+
+  for (const cp of CURRENCY_PAIRS) {
+    const pair = cp.pair;
+    const pred = predictions[pair];
+    const liveRate = liveRates[pair];
+    if (!pred && !liveRate) continue;
+    const ref = pred?.history_ref || {};
+    const horizons = pred?.horizons || {};
+
+    count++;
+
+    html += `<tr>`;
+
+    // 货币对名称
+    html += `<td class="left pair-cell">
+      <div class="pair-sell">${cp.sell.split(' ')[0]}</div>
+      <div class="pair-buy">${cp.buy}</div>
+      <div class="pair-code">${pair}</div>
+    </td>`;
+
+    // 过去1周
+    const r7d = ref.rate_7d_ago;
+    const chg7d = fmtChg(liveRate, r7d);
+    html += `<td>
+      ${r7d ? `<div class="rate-val">${fmtRate(pair, r7d)}</div>
+      ${chg7d != null ? `<div class="rate-chg ${chgClass(chg7d)}">${chg7d > 0 ? '+' : ''}${chg7d.toFixed(2)}%</div>` : ''}` : '<span class="muted">—</span>'}
+    </td>`;
+
+    // 过去1月
+    const r30d = ref.rate_30d_ago;
+    const chg30d = fmtChg(liveRate, r30d);
+    html += `<td>
+      ${r30d ? `<div class="rate-val">${fmtRate(pair, r30d)}</div>
+      ${chg30d != null ? `<div class="rate-chg ${chgClass(chg30d)}">${chg30d > 0 ? '+' : ''}${chg30d.toFixed(2)}%</div>` : ''}` : '<span class="muted">—</span>'}
+    </td>`;
+
+    // 实时汇率
+    html += `<td class="live-cell">
+      ${liveRate ? `<div class="rate-val">${fmtRate(pair, liveRate)}</div>` : '<span class="muted">—</span>'}
+    </td>`;
+
+    // 6个预测维度
+    const hkeys = ['1w', '2w', '1m', '2m', '3m', '6m'];
+    for (const hk of hkeys) {
+      const h = horizons[hk];
+      if (!h) {
+        html += `<td><span class="muted">—</span></td>`;
+        continue;
+      }
+      const chgPct = h.predicted_return;
+      const cls = chgClass(chgPct);
+      const ci95 = h.confidence_interval_95;
+      const hm = String(h.method || '');
+      let method = '技术分析';
+      if (hm.includes('lightgbm_bridge_7d')) method = 'ML短端衔接(1周)';
+      else if (hm.includes('lightgbm_bridge_14d')) method = 'ML短端衔接(2周)';
+      else if (hm.includes('lightgbm_extrapolated_180d')) method = 'LightGBM外推(6个月)';
+      else if (hm.includes('lightgbm_ensemble')) method = 'LightGBM集成';
+      if (hm.includes('commodity_cap')) method += '·波动限幅';
+      if (hm.includes('dx_damp')) method += '·美元指数微调';
+
+      html += `<td class="pred-cell">
+        <div class="rate-val ${cls}">${fmtRate(pair, h.predicted_price)}</div>
+        <div class="rate-chg ${cls}">${chgPct > 0 ? '+' : ''}${chgPct?.toFixed(2)}%</div>
+        ${chgTag(h.direction)}
+      </td>`;
+    }
+
+    html += `</tr>`;
+  }
+
+  tbody.innerHTML = html || `<tr class="loading-row"><td colspan="10">无数据</td></tr>`;
+  document.getElementById('predCount').textContent = `共 ${count} 个货币对`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  API 调用
+// ════════════════════════════════════════════════════════════
+async function loadPredictions(skipRates = false) {
+  try {
+    const fetches = [fetch('/api/predictions')];
+    if (!skipRates) fetches.push(fetch('/api/rates'));
+    const responses = await Promise.all(fetches);
+    const predJson = await responses[0].json();
+    let ratesJson = { status: 'success', data: {} };
+    if (!skipRates) {
+      ratesJson = await responses[1].json();
+    }
+
+    const pred = predJson.status === 'success' ? predJson.data : null;
+    const rates = ratesJson.status === 'success' ? ratesJson.data : {};
+
+    _latestData = pred;
+    renderTable(pred, rates);
+
+    const fnEl = document.getElementById('usdCnyFrameworkNote');
+    if (fnEl) {
+      const fw = pred?.predictions?.['USD/CNY']?.framework_note_zh;
+      if (fw) {
+        fnEl.textContent = fw;
+        fnEl.style.display = 'block';
+      } else {
+        fnEl.textContent = '';
+        fnEl.style.display = 'none';
+      }
+    }
+
+    if (pred?.predicted_at) {
+      document.getElementById('lastUpdate').textContent =
+        `最后更新：${fmtTs(pred.predicted_at)}（${pred.session || ''}）`;
+    }
+
+    // 实时汇率状态（仅在非 skipRates 模式更新指示器）
+    if (!skipRates) {
+      const cfetsDot = document.getElementById('cfets-dot');
+      const cfetsStatus = document.getElementById('cfets-status');
+      const hasRates = Object.keys(rates).length > 0;
+      cfetsDot.className = hasRates ? 'dot green' : 'dot red';
+      if (hasRates) {
+        cfetsStatus.innerHTML = `连接成功 · ${Object.keys(rates).length} 对`;
+        cfetsStatus.style.cursor = 'default';
+        cfetsStatus.onclick = null;
+      } else {
+        cfetsStatus.innerHTML = '<a href="javascript:void(0)" style="color:var(--danger);text-decoration:underline;">连接失败，点击重连</a>';
+        cfetsStatus.style.cursor = 'pointer';
+        cfetsStatus.onclick = loadPredictions;
+      }
+    }
+
+    return true;
+  } catch (e) {
+    console.error('加载数据失败:', e);
+    if (!_latestData) renderTable(null, null);
+    document.getElementById('cfets-dot').className = 'dot red';
+    const cfetsStatus = document.getElementById('cfets-status');
+    cfetsStatus.innerHTML = '<a href="javascript:void(0)" style="color:var(--danger);text-decoration:underline;">连接失败，点击重连</a>';
+    cfetsStatus.style.cursor = 'pointer';
+    cfetsStatus.onclick = loadPredictions;
+    return false;
+  }
+}
+
+async function loadSchedulerStatus() {
+  try {
+    const resp = await fetch('/api/scheduler/status');
+    const json = await resp.json();
+    if (json.status === 'success') {
+      const s = json.data;
+      const dot = document.getElementById('sched-dot');
+      const label = document.getElementById('sched-status');
+      if (s.running) {
+        dot.className = s.is_trading_day ? 'dot green' : 'dot orange';
+        label.textContent = s.is_trading_day ? '调度运行中' : '非交易日';
+        const jobs = s.jobs || [];
+        if (jobs.length > 0) {
+          const nextJob = jobs.find(j => j.next_run);
+          if (nextJob) {
+            document.getElementById('nextUpdate').textContent =
+              `下次预测：${nextJob.next_run?.substring(11, 16) || '—'}`;
+          }
+        }
+                } else {
+        dot.className = 'dot red';
+        label.textContent = '调度未启动';
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// ════════════════════════════════════════════════════════════
+//  手动刷新
+// ════════════════════════════════════════════════════════════
+async function triggerManualPredict() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  btn.disabled = true;
+  icon.className = 'spin';
+  icon.textContent = '⟳';
+
+  try {
+    const resp = await fetch('/api/predict/manual', { method: 'POST' });
+    const json = await resp.json();
+    showToast('预测任务已启动，约 60 秒后完成…', 'ok');
+
+    // 每 8 秒轮询一次预测结果，最多等 120 秒，期间不重复拉汇率
+    let retries = 15;
+    const poll = setInterval(async () => {
+      retries--;
+      await loadPredictions(true);  // skipRates: 轮询期间只查预测，不重复拉汇率
+      if (retries <= 0 || (_latestData && new Date(_latestData.predicted_at) > new Date(Date.now() - 100_000))) {
+        clearInterval(poll);
+        btn.disabled = false;
+        icon.className = '';
+        icon.textContent = '🔄';
+        // 预测完成后用完整模式刷新一次（含汇率）
+        await loadPredictions(false);
+        showToast('预测已完成并更新', 'ok');
+      }
+    }, 8000);
+
+  } catch (e) {
+    showToast('手动刷新失败：' + e.message, 'err');
+    btn.disabled = false;
+    icon.className = '';
+    icon.textContent = '🔄';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  设置对话框
+// ════════════════════════════════════════════════════════════
+function openSettings() {
+  _verifiedPassword = '';
+  document.getElementById('authLayer').style.display = 'block';
+  document.getElementById('settingsContent').style.display = 'none';
+  document.getElementById('settingsFooter').style.display = 'none';
+  document.getElementById('authError').style.display = 'none';
+  document.getElementById('authPwd').value = '';
+  document.getElementById('settingsModal').classList.add('open');
+  setTimeout(() => document.getElementById('authPwd').focus(), 100);
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function networkDiagFields() {
+  let to = parseInt(document.getElementById('httpTimeout').value, 10);
+  if (!Number.isFinite(to) || to < 5) to = 25;
+  if (to > 120) to = 120;
+  return {
+    http_proxy: (document.getElementById('httpProxy').value || '').trim(),
+    http_timeout_sec: to,
+    cfets_realtime_url: (document.getElementById('cfetsUrl').value || '').trim(),
+    hkma_spot_rates_url: (document.getElementById('hkmaUrl').value || '').trim(),
+  };
+}
+
+function fillSettingsFormFromData(d) {
+  if (!d) return;
+  const defBase = 'https://api.openai.com/v1';
+  document.getElementById('openaiBase').value = d.llm_base_url || defBase;
+  document.getElementById('openaiModel').value = d.llm_model || 'gpt-4o-mini';
+  document.getElementById('cfetsUrl').value = d.cfets_realtime_url || '';
+  document.getElementById('hkmaUrl').value = d.hkma_spot_rates_url || '';
+  document.getElementById('httpProxy').value = d.http_proxy || '';
+  document.getElementById('httpTimeout').value = d.http_timeout_sec != null ? d.http_timeout_sec : 25;
+
+  const apiKeys = d.api_keys || {};
+  const keyMap = [
+    ['fred_api_key', 'fredKey'],
+    ['openai_api_key', 'openaiKey'],
+    ['news_api_key', 'newsKey'],
+    ['banxico_api_key', 'banxicoKey'],
+  ];
+  for (const [name, elId] of keyMap) {
+    const masked = apiKeys[name];
+    const el = document.getElementById(elId);
+    if (!el) continue;
+    if (masked && masked.length > 4) {
+      el.placeholder = '已保存: ' + masked + '（不会回显明文）';
+      el.value = '';
+    } else {
+      el.placeholder = elId === 'openaiKey' ? 'sk-...' : (elId === 'newsKey' ? '留空则仅用国内新闻源' : '');
+    }
+  }
+}
+
+async function refreshSettingsFormFromServer() {
+  if (!_verifiedPassword) return;
+  try {
+    const resp = await fetch(`/api/settings?password=${encodeURIComponent(_verifiedPassword)}`);
+    if (resp.status !== 200) return;
+    const json = await resp.json();
+    fillSettingsFormFromData(json.data || {});
+  } catch { /* ignore */ }
+}
+
+async function exportSettingsJson() {
+  if (!_verifiedPassword) {
+    showToast('请先验证管理员密码', 'err');
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/settings/export?password=${encodeURIComponent(_verifiedPassword)}`);
+    if (resp.status === 401) {
+      showToast('密码无效，请关闭设置后重新打开', 'err');
+      return;
+    }
+    if (!resp.ok) {
+      showToast('导出失败', 'err');
+      return;
+    }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'system_settings.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('已下载 system_settings.json', 'ok');
+  } catch (e) {
+    showToast('导出失败：' + e.message, 'err');
+  }
+}
+
+async function importSettingsJsonFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  if (!_verifiedPassword) {
+    showToast('请先验证管理员密码', 'err');
+    return;
+  }
+  try {
+    const text = await f.text();
+    const snap = JSON.parse(text);
+    const resp = await fetch('/api/settings/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: _verifiedPassword, snapshot: snap }),
+    });
+    const json = await resp.json();
+    if (json.status === 'success') {
+      await refreshSettingsFormFromServer();
+      showToast(json.message + '（表单已刷新；密钥不会在页面回显，但已在服务端生效）', 'ok');
+            } else {
+      showToast('导入失败：' + (json.message || ''), 'err');
+    }
+  } catch (e) {
+    showToast('导入失败：' + e.message, 'err');
+  }
+}
+
+async function verifySettingsPassword() {
+  const pwd = document.getElementById('authPwd').value;
+  if (!pwd) return;
+
+  try {
+    const resp = await fetch(`/api/settings?password=${encodeURIComponent(pwd)}`);
+    if (resp.status === 401) {
+      const errEl = document.getElementById('authError');
+      errEl.textContent = '密码错误';
+      errEl.className = 'test-result err';
+      errEl.style.display = 'block';
+      return;
+    }
+    const json = await resp.json();
+    _verifiedPassword = pwd;
+    document.getElementById('authLayer').style.display = 'none';
+    document.getElementById('settingsContent').style.display = 'block';
+    document.getElementById('settingsFooter').style.display = 'flex';
+    fillSettingsFormFromData(json.data || {});
+  } catch (e) {
+    showToast('验证失败：' + e.message, 'err');
+  }
+}
+
+async function saveSettings() {
+  let to = parseInt(document.getElementById('httpTimeout').value, 10);
+  if (!Number.isFinite(to) || to < 5) to = 25;
+  if (to > 120) to = 120;
+  const payload = {
+    password: _verifiedPassword,
+    fred_api_key: document.getElementById('fredKey').value,
+    openai_api_key: document.getElementById('openaiKey').value,
+    openai_base_url: (document.getElementById('openaiBase').value || '').trim(),
+    openai_model: (document.getElementById('openaiModel').value || '').trim(),
+    news_api_key: document.getElementById('newsKey').value,
+    banxico_api_key: document.getElementById('banxicoKey').value,
+    cfets_realtime_url: (document.getElementById('cfetsUrl').value || '').trim(),
+    hkma_spot_rates_url: (document.getElementById('hkmaUrl').value || '').trim(),
+    http_proxy: (document.getElementById('httpProxy').value || '').trim(),
+    http_timeout_sec: to,
+  };
+  const networkKeys = new Set(['cfets_realtime_url', 'hkma_spot_rates_url', 'http_proxy', 'http_timeout_sec', 'password']);
+  for (const k of Object.keys(payload)) {
+    if (!networkKeys.has(k) && !payload[k]) delete payload[k];
+  }
+  try {
+    const ctrl = new AbortController();
+    const kill = setTimeout(() => ctrl.abort(), 120000);
+    const resp = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    clearTimeout(kill);
+    const json = await resp.json();
+    if (json.status === 'success') {
+      showToast(json.message || '设置已保存', 'ok');
+      closeSettings();
+    } else {
+      showToast('保存失败：' + json.message, 'err');
+    }
+  } catch (e) {
+    const msg = e.name === 'AbortError' ? '保存请求超时，请检查网络或服务是否卡顿' : e.message;
+    showToast('保存失败：' + msg, 'err');
+  }
+}
+
+async function testConnection(service, apiKey) {
+  const resultEl = document.getElementById('connResult');
+  resultEl.textContent = `测试 ${service.toUpperCase()} 连接中...`;
+  resultEl.className = 'test-result ok';
+  resultEl.style.display = 'block';
+
+  try {
+    const resp = await fetch('/api/settings/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: _verifiedPassword, service, api_key: apiKey, ...networkDiagFields() }),
+    });
+    const json = await resp.json();
+    const d = json.data || {};
+    if (d.status === 'ok') {
+      resultEl.textContent = `✅ ${d.message}`;
+      resultEl.className = 'test-result ok';
+    } else {
+      resultEl.textContent = `❌ ${d.message}`;
+      resultEl.className = 'test-result err';
+    }
+  } catch (e) {
+    resultEl.textContent = `❌ 请求失败: ${e.message}`;
+    resultEl.className = 'test-result err';
+  }
+}
+
+function testFredKey() {
+  testConnection('fred', document.getElementById('fredKey').value);
+}
+function testOpenAIKey() {
+  const key = document.getElementById('openaiKey').value;
+  const base = document.getElementById('openaiBase').value;
+  const payload = { password: _verifiedPassword, service: 'openai', api_key: key, base_url: base, ...networkDiagFields() };
+  fetch('/api/settings/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(r => r.json()).then(json => {
+    const d = json.data || {};
+    const el = document.getElementById('connResult');
+    if (d.status === 'ok') {
+      el.textContent = `✅ ${d.message}`;
+      el.className = 'test-result ok';
+    } else {
+      el.textContent = `❌ ${d.message}`;
+      el.className = 'test-result err';
+    }
+    el.style.display = 'block';
+  });
+}
+async function changePassword() {
+  const newPwd = document.getElementById('newPwd').value;
+  const resultEl = document.getElementById('pwdResult');
+  if (!newPwd || newPwd.length < 6) {
+    resultEl.textContent = '新密码至少 6 位';
+    resultEl.className = 'test-result err';
+    resultEl.style.display = 'block';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/settings/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_password: _verifiedPassword, new_password: newPwd }),
+    });
+    const json = await resp.json();
+    if (json.status === 'success') {
+      _verifiedPassword = newPwd;
+      resultEl.textContent = '✅ 密码修改成功';
+      resultEl.className = 'test-result ok';
+      document.getElementById('newPwd').value = '';
+            } else {
+      resultEl.textContent = `❌ ${json.message}`;
+      resultEl.className = 'test-result err';
+    }
+    resultEl.style.display = 'block';
+  } catch (e) {
+    resultEl.textContent = '❌ 请求失败';
+    resultEl.className = 'test-result err';
+    resultEl.style.display = 'block';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  Toast
+// ════════════════════════════════════════════════════════════
+let _toastTimer;
+function showToast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show toast-${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+// ════════════════════════════════════════════════════════════
+//  初始化
+// ════════════════════════════════════════════════════════════
+async function init() {
+  // 显示占位表格结构
+  document.getElementById('tableBody').innerHTML = `
+    <tr class="loading-row">
+      <td colspan="10"><span class="mini-spinner"></span>正在加载预测数据...</td>
+    </tr>`;
+
+  await loadPredictions();
+  await loadSchedulerStatus();
+
+  // 每 30 秒自动刷新状态
+        setInterval(async () => {
+    await loadPredictions();
+    await loadSchedulerStatus();
+  }, 30_000);
+}
+
+window.addEventListener('load', init);
+    </script>
+</body>
+</html>
